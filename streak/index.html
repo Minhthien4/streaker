@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kin's Planner - Kỷ Luật & Tự Do</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Kích hoạt chế độ dark mode bằng class
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a',
+                        darkcard: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile */
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.05);
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.5);
+            border-radius: 10px;
+        }
+
+        /* Animations */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0px); }
+        }
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes confetti {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100px) rotate(720deg); opacity: 0; }
+        }
+        
+        .task-enter {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .task-complete {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* New Style for Action Buttons */
+        .task-action-btn {
+            opacity: 0.6;
+            transition: all 0.2s;
+        }
+        .group:hover .task-action-btn {
+            opacity: 1;
+        }
+
+        /* Glassmorphism - Light & Dark */
+        .glass {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .dark .glass {
+            background: rgba(30, 41, 59, 0.85); /* Slate 800 with opacity */
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+        }
+
+        /* Hide specific elements on mobile if needed */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        /* Avatar Glow Animation for high ranks */
+        .avatar-glow {
+            animation: glow 2s infinite alternate;
+        }
+        @keyframes glow {
+            from { box-shadow: 0 0 10px #fff, 0 0 20px #4f46e5; }
+            to { box-shadow: 0 0 20px #fff, 0 0 30px #a855f7; }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden text-gray-800 dark:text-gray-100 bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-500">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-11/12 max-w-sm pointer-events-none"></div>
+
+    <!-- Main App Container -->
+    <div class="flex flex-col h-full max-w-md mx-auto bg-white/50 dark:bg-slate-900/50 shadow-2xl overflow-hidden relative sm:rounded-xl sm:my-4 sm:h-[95vh] sm:border sm:border-white/50 dark:sm:border-slate-700 transition-colors duration-500">
+        
+        <!-- Header -->
+        <header class="glass p-4 flex justify-between items-center z-10 shadow-sm transition-colors duration-500">
+            <div class="flex items-center gap-2">
+                <!-- Header Avatar (Mini) -->
+                <div class="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-md overflow-hidden p-0.5">
+                     <img id="header-avatar-img" src="" class="w-full h-full rounded-full bg-white object-cover">
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight text-indigo-900 dark:text-indigo-300">Kin's Planner</h1>
+                    <p class="text-xs text-indigo-600 dark:text-indigo-400 font-semibold" id="header-date">Loading...</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="header-rank-badge" class="px-2 py-1 rounded-lg bg-yellow-100 text-yellow-700 text-xs font-bold border border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700/50">
+                    <i class="fas fa-trophy mr-1"></i> <span id="header-streak">0</span>
+                </span>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth p-4 pb-24" id="main-content">
+            <!-- Content injected by JS -->
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="glass absolute bottom-0 w-full p-2 pb-4 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-20 transition-colors duration-500">
+            <ul class="flex justify-around items-center">
+                <li>
+                    <button onclick="router('motivation')" class="nav-btn group flex flex-col items-center gap-1 p-2 text-gray-400 hover:text-indigo-600 dark:text-gray-500 dark:hover:text-indigo-400 transition-colors active" data-target="motivation">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center group-hover:bg-indigo-50 dark:group-hover:bg-slate-700 transition-colors">
+                            <i class="fas fa-fire-alt text-xl mb-1 transform group-hover:scale-110 transition-transform"></i>
+                        </div>
+                        <span class="text-[10px] font-bold">Động Lực</span>
+                    </button>
+                </li>
+                <li>
+                    <button onclick="router('calendar')" class="nav-btn group flex flex-col items-center gap-1 p-2 text-gray-400 hover:text-indigo-600 dark:text-gray-500 dark:hover:text-indigo-400 transition-colors" data-target="calendar">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center group-hover:bg-indigo-50 dark:group-hover:bg-slate-700 transition-colors">
+                            <i class="fas fa-calendar-alt text-xl mb-1 transform group-hover:scale-110 transition-transform"></i>
+                        </div>
+                        <span class="text-[10px] font-bold">Lịch</span>
+                    </button>
+                </li>
+                <li>
+                    <button onclick="router('create-schedule')" class="nav-btn group flex flex-col items-center gap-1 p-2 -mt-8" data-target="create-schedule">
+                        <div class="w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-300 flex items-center justify-center transform hover:-translate-y-1 transition-transform dark:shadow-none dark:border-4 dark:border-slate-800">
+                            <i class="fas fa-plus text-2xl"></i>
+                        </div>
+                    </button>
+                </li>
+                <li>
+                    <button onclick="router('history')" class="nav-btn group flex flex-col items-center gap-1 p-2 text-gray-400 hover:text-indigo-600 dark:text-gray-500 dark:hover:text-indigo-400 transition-colors" data-target="history">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center group-hover:bg-indigo-50 dark:group-hover:bg-slate-700 transition-colors">
+                            <i class="fas fa-history text-xl mb-1 transform group-hover:scale-110 transition-transform"></i>
+                        </div>
+                        <span class="text-[10px] font-bold">Lịch Sử</span>
+                    </button>
+                </li>
+                <li>
+                    <button onclick="router('profile')" class="nav-btn group flex flex-col items-center gap-1 p-2 text-gray-400 hover:text-indigo-600 dark:text-gray-500 dark:hover:text-indigo-400 transition-colors" data-target="profile">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center group-hover:bg-indigo-50 dark:group-hover:bg-slate-700 transition-colors">
+                            <i class="fas fa-user-circle text-xl mb-1 transform group-hover:scale-110 transition-transform"></i>
+                        </div>
+                        <span class="text-[10px] font-bold">Avatar</span>
+                    </button>
+                </li>
+            </ul>
+        </nav>
+    </div>
+
+    <!-- Modals -->
+    <!-- Task Detail Modal -->
+    <div id="modal-backdrop" class="fixed inset-0 bg-black/40 z-40 hidden backdrop-blur-sm transition-opacity opacity-0" onclick="closeModal()"></div>
+    <div id="date-popup" class="fixed bottom-0 left-0 w-full sm:w-[28rem] sm:left-1/2 sm:-translate-x-1/2 bg-white dark:bg-slate-800 rounded-t-3xl z-50 transform translate-y-full transition-transform duration-300 p-6 shadow-2xl pb-10">
+        <div class="w-12 h-1 bg-gray-300 dark:bg-slate-600 rounded-full mx-auto mb-4"></div>
+        <h3 id="popup-date-title" class="text-xl font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+            <i class="far fa-calendar-check text-indigo-500"></i> <span>Chi tiết ngày</span>
+        </h3>
+        <div id="popup-content" class="space-y-3 max-h-[60vh] overflow-y-auto">
+            <!-- Events rendered here -->
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION & STATE ---
+        const APP_KEY = 'kin_planner_data_v1';
+        
+        let appData = {
+            user: {
+                name: 'Kin',
+                streak: 0,
+                xp: 0, 
+                lastCompletedDate: null, 
+                rank: 'Tân Binh'
+            },
+            settings: {
+                theme: 'light' // 'light' or 'dark'
+            },
+            tasks: {}, 
+            events: [] 
+        };
+
+        // State variables
+        let calendarViewDate = new Date();
+        let motivationViewDate = null; 
+
+        // Avatar URL xây dựng dựa trên DiceBear API
+        const ranks = [
+            { 
+                name: 'Tân Binh', 
+                minXP: 0, 
+                color: 'text-gray-600 bg-gray-100 border-gray-300 dark:bg-slate-700 dark:text-gray-300 dark:border-slate-600',
+                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&clothing=shirtCrewNeck&eyebrows=default&mouth=default' 
+            },
+            { 
+                name: 'Đồng', 
+                minXP: 10, 
+                color: 'text-orange-700 bg-orange-100 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700',
+                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka&clothing=collarAndSweater&glasses=round'
+            },
+            { 
+                name: 'Bạc', 
+                minXP: 30, 
+                color: 'text-slate-700 bg-slate-200 border-slate-400 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-500',
+                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Precious&clothing=graphicShirt&top=shortHairTheCaesarSidePart'
+            },
+            { 
+                name: 'Vàng', 
+                minXP: 70, 
+                color: 'text-yellow-700 bg-yellow-100 border-yellow-400 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-600',
+                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=George&clothing=blazerAndShirt&accessories=sunglasses'
+            },
+            { 
+                name: 'Bạch Kim', 
+                minXP: 150, 
+                color: 'text-cyan-700 bg-cyan-100 border-cyan-400 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-600',
+                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jack&top=hat&clothing=shirtVNeck&facialHair=beardMedium'
+            },
+            { 
+                name: 'Kim Cương', 
+                minXP: 300, 
+                color: 'text-purple-700 bg-purple-100 border-purple-400 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-600',
+                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=King&clothing=hoodie&accessories=prescription02&top=longHairDreads'
+            },
+            { 
+                name: 'Tinh Anh', 
+                minXP: 600, 
+                color: 'text-rose-700 bg-rose-100 border-rose-400 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-600',
+                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mimi&top=bigHair&hairColor=platinum&skinColor=pale'
+            },
+            { 
+                name: 'Đại Sư', 
+                minXP: 1200, 
+                color: 'text-emerald-700 bg-emerald-100 border-emerald-400 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-600',
+                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Wise&facialHair=beardMajestic&top=winterHat02&clothing=overall'
+            },
+            { 
+                name: 'Huyền Thoại', 
+                minXP: 2500, 
+                color: 'text-red-700 bg-red-100 border-red-400 dark:bg-red-900/30 dark:text-red-300 dark:border-red-600',
+                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Legend&top=winterHat04&accessories=wayfarers&clothing=blazerAndSweater'
+            },
+            { 
+                name: 'Vua Trò Chơi', 
+                minXP: 5000, 
+                color: 'text-indigo-800 bg-indigo-200 border-indigo-500 dark:bg-indigo-900/50 dark:text-indigo-200 dark:border-indigo-500',
+                avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=GodMode&colors=amber,cyan,lime'
+            }
+        ];
+
+        const taskIcons = ['💪', '📚', '🏃', '💊', '🧹', '💻', '🎨', '🍳', '💰', '🧘', '🎸', '🎮'];
+        
+        // --- INITIALIZATION ---
+        function init() {
+            loadData();
+            if (appData.user.xp === undefined) {
+                appData.user.xp = appData.user.streak; 
+            }
+            // Initialize settings if missing
+            if (!appData.settings) {
+                appData.settings = { theme: 'light' };
+            }
+
+            // Apply theme immediately
+            applyTheme(appData.settings.theme);
+
+            checkDailyLogic();
+            updateHeader();
+            motivationViewDate = getTodayStr(); 
+            router('motivation'); 
+            
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('header-date').innerText = formatDateVN(now, true);
+                if(document.querySelector('.nav-btn.text-indigo-600') && document.querySelector('.nav-btn.text-indigo-600').dataset.target === 'motivation') {
+                     if(now.getMinutes() === 0) {
+                        motivationViewDate = getTodayStr(); 
+                        renderMotivationPage(document.getElementById('main-content'));
+                     }
+                }
+            }, 60000);
+            document.getElementById('header-date').innerText = formatDateVN(new Date(), true);
+        }
+
+        // --- THEME LOGIC ---
+        function toggleTheme() {
+            const newTheme = appData.settings.theme === 'light' ? 'dark' : 'light';
+            appData.settings.theme = newTheme;
+            saveData();
+            applyTheme(newTheme);
+            // Re-render current page to apply specific JS-based styles if any (mostly handled by CSS classes)
+            const currentPage = document.querySelector('.nav-btn.text-indigo-600').dataset.target;
+            router(currentPage);
+        }
+
+        function applyTheme(theme) {
+            const html = document.documentElement;
+            if (theme === 'dark') {
+                html.classList.add('dark');
+            } else {
+                html.classList.remove('dark');
+            }
+        }
+
+        // --- CORE LOGIC ---
+
+        function loadData() {
+            const saved = localStorage.getItem(APP_KEY);
+            if (saved) {
+                appData = JSON.parse(saved);
+                if (!appData.events) appData.events = [];
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem(APP_KEY, JSON.stringify(appData));
+            updateHeader();
+        }
+
+        function checkDailyLogic() {
+            updateRank();
+        }
+
+        function updateRank() {
+            let currentRank = 'Tân Binh';
+            let xp = appData.user.xp;
+            for (let r of ranks) {
+                if (xp >= r.minXP) currentRank = r.name;
+            }
+            appData.user.rank = currentRank;
+            saveData();
+        }
+
+        function getTodayStr() {
+            return new Date().toISOString().split('T')[0];
+        }
+        
+        function getTomorrowStr() {
+            const d = new Date();
+            d.setDate(d.getDate() + 1);
+            return d.toISOString().split('T')[0];
+        }
+
+        function getYesterdayStr() {
+            const d = new Date();
+            d.setDate(d.getDate() - 1);
+            return d.toISOString().split('T')[0];
+        }
+
+        function formatDateVN(dateObj, includeTime = false) {
+            const options = { weekday: 'long', day: 'numeric', month: 'numeric' };
+            let str = dateObj.toLocaleDateString('vi-VN', options);
+            if (includeTime) {
+                str += ` • ${dateObj.getHours()}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+            }
+            return str;
+        }
+
+        // --- NAVIGATION ---
+        function router(page) {
+            const main = document.getElementById('main-content');
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-indigo-600');
+                btn.classList.remove('dark:text-indigo-400');
+                btn.classList.add('text-gray-400');
+                btn.classList.add('dark:text-gray-500');
+                
+                if(btn.dataset.target === page) {
+                    btn.classList.remove('text-gray-400');
+                    btn.classList.remove('dark:text-gray-500');
+                    btn.classList.add('text-indigo-600');
+                    btn.classList.add('dark:text-indigo-400');
+                }
+            });
+
+            switch(page) {
+                case 'motivation': 
+                    motivationViewDate = getTodayStr();
+                    renderMotivationPage(main); 
+                    break;
+                case 'calendar': 
+                    renderCalendarPage(main); 
+                    break;
+                case 'create-schedule': renderCreateSchedulePage(main); break;
+                case 'history': renderHistoryPage(main); break;
+                case 'profile': renderProfilePage(main); break;
+            }
+        }
+
+        // --- PAGE: MOTIVATION ---
+        function setMotivationDate(dateStr) {
+            motivationViewDate = dateStr;
+            renderMotivationPage(document.getElementById('main-content'));
+        }
+
+        function renderMotivationPage(container) {
+            const now = new Date();
+            const hour = now.getHours();
+            
+            const todayStr = getTodayStr();
+            const tomorrowStr = getTomorrowStr();
+            const yesterdayStr = getYesterdayStr();
+            
+            const isViewingToday = motivationViewDate === todayStr;
+            const isViewingTomorrow = motivationViewDate === tomorrowStr;
+            const isViewingYesterday = motivationViewDate === yesterdayStr;
+
+            let cardColorClass = 'bg-indigo-600 shadow-indigo-300 dark:bg-indigo-700 dark:shadow-none'; 
+            let cardTitle = `Hôm nay, ${formatDateVN(new Date(motivationViewDate))}`;
+            let cardSub = '"Kỷ luật là cầu nối giữa mục tiêu và thành tựu."';
+            let cardIcon = 'check-circle';
+
+            if (isViewingTomorrow) {
+                cardColorClass = 'bg-purple-600 shadow-purple-300 dark:bg-purple-700 dark:shadow-none';
+                cardTitle = `Ngày mai, ${formatDateVN(new Date(motivationViewDate))}`;
+                cardSub = '"Chuẩn bị kỹ lưỡng là một nửa chiến thắng."';
+                cardIcon = 'rocket';
+            } else if (isViewingYesterday) {
+                cardColorClass = 'bg-slate-500 shadow-slate-300 grayscale-[0.2] dark:bg-slate-700 dark:shadow-none';
+                cardTitle = `Hôm qua, ${formatDateVN(new Date(motivationViewDate))}`;
+                cardSub = '"Xem lại để rút kinh nghiệm."';
+                cardIcon = 'history';
+            }
+
+            let topSwitchBtn = '';
+            if (isViewingToday) {
+                if (hour >= 23) {
+                    topSwitchBtn = `
+                        <button onclick="setMotivationDate('${tomorrowStr}')" class="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-md transition-all flex items-center gap-1 border border-white/20 z-20">
+                            Xem lịch mới <i class="fas fa-arrow-right"></i>
+                        </button>
+                    `;
+                } else {
+                    topSwitchBtn = `
+                        <button onclick="setMotivationDate('${yesterdayStr}')" class="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-md transition-all flex items-center gap-1 border border-white/20 z-20">
+                            <i class="fas fa-arrow-left"></i> Xem hôm qua
+                        </button>
+                    `;
+                }
+            } else {
+                topSwitchBtn = `
+                    <button onclick="setMotivationDate('${todayStr}')" class="absolute top-4 right-4 bg-white text-indigo-600 text-xs font-bold px-3 py-1.5 rounded-full shadow-lg transition-transform hover:scale-105 z-20 dark:bg-slate-800 dark:text-white">
+                        Về hôm nay <i class="fas fa-undo"></i>
+                    </button>
+                `;
+            }
+
+            let html = `
+                <div class="space-y-6 relative">
+                    <div class="${cardColorClass} rounded-2xl p-6 text-white shadow-lg relative overflow-hidden transition-colors duration-500">
+                        ${topSwitchBtn}
+                        <div class="absolute -right-4 -top-4 text-white opacity-10 text-9xl"><i class="fas fa-${cardIcon}"></i></div>
+                        
+                        <h2 class="text-xl font-bold mb-1 mt-2">${cardTitle}</h2>
+                        <p class="text-white/80 text-sm italic mb-4">${cardSub}</p>
+                        
+                        <div class="flex items-center gap-2">
+                            <div class="flex-1 h-2 bg-black/20 rounded-full overflow-hidden">
+                                <div id="progress-bar" class="h-full bg-white transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                            <span id="progress-text" class="text-xs font-bold">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Task List -->
+                    <div id="task-list-container" class="space-y-3 pb-10">
+                        <!-- Tasks go here -->
+                    </div>
+                </div>
+            `;
+            
+            let fabHtml = '';
+            
+            if (isViewingYesterday) {
+                 fabHtml = ''; 
+            } else if (isViewingTomorrow) {
+                fabHtml = `
+                    <div id="fab-container" class="fixed bottom-24 right-4 z-30">
+                        <button onclick="openAddTaskModal('${tomorrowStr}', 'Ngày mai')" class="bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-full shadow-lg flex items-center gap-2 pr-6 transition-transform hover:scale-105 dark:shadow-none dark:border-2 dark:border-purple-400">
+                            <span class="w-8 h-8 flex items-center justify-center bg-white/20 rounded-full"><i class="fas fa-plus"></i></span>
+                            <span class="font-bold">Thêm việc Mai</span>
+                        </button>
+                    </div>
+                `;
+            } else {
+                if (hour >= 23) {
+                    fabHtml = `
+                         <div id="fab-container" class="fixed bottom-24 right-4 z-30">
+                            <button onclick="setMotivationDate('${tomorrowStr}')" class="bg-indigo-500 hover:bg-indigo-600 text-white p-3 rounded-full shadow-lg flex items-center gap-2 pr-4 transition-transform hover:scale-105 animate-pulse dark:shadow-none dark:border-2 dark:border-indigo-400">
+                                <i class="fas fa-arrow-right"></i>
+                                <span class="font-bold text-sm">Lên lịch mai</span>
+                            </button>
+                        </div>
+                    `;
+                } else if (hour < 1) {
+                    fabHtml = `
+                        <div id="fab-container" class="fixed bottom-24 right-4 z-30">
+                            <button onclick="openAddTaskModal('${todayStr}', 'Hôm nay')" class="bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-lg flex items-center gap-2 pr-6 transition-transform hover:scale-105 animate-bounce dark:shadow-none dark:border-2 dark:border-indigo-400">
+                                <span class="w-8 h-8 flex items-center justify-center bg-white/20 rounded-full"><i class="fas fa-sun"></i></span>
+                                <span class="font-bold">Thêm việc Hôm nay</span>
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    fabHtml = `
+                        <div class="fixed bottom-24 right-4 z-30 opacity-50 pointer-events-none">
+                             <div class="bg-gray-800 text-white text-[10px] px-3 py-1 rounded-full shadow-sm dark:bg-slate-700">
+                                <i class="fas fa-lock"></i> Giờ hành động
+                             </div>
+                        </div>
+                    `;
+                }
+            }
+
+            container.innerHTML = html + fabHtml;
+            renderTasks(motivationViewDate);
+        }
+
+        function renderTasks(dateStr) {
+            const listContainer = document.getElementById('task-list-container');
+            const tasks = appData.tasks[dateStr] || [];
+            
+            if (tasks.length === 0) {
+                let msg = "Chưa có nhiệm vụ nào!";
+                if(dateStr === getTomorrowStr()) msg = "Lên kế hoạch cho ngày mai ngay!";
+                if(dateStr === getYesterdayStr()) msg = "Không có nhiệm vụ trong quá khứ.";
+
+                listContainer.innerHTML = `
+                    <div class="text-center py-10 text-gray-400 dark:text-gray-500">
+                        <img src="https://cdn-icons-png.flaticon.com/512/7486/7486744.png" class="w-24 mx-auto mb-3 opacity-50 grayscale dark:invert-[0.2]" alt="Empty">
+                        <p>${msg}</p>
+                    </div>
+                `;
+                updateProgress(0, 0);
+                return;
+            }
+
+            const incomplete = tasks.filter(t => !t.completed);
+            const complete = tasks.filter(t => t.completed);
+            const sortedTasks = [...incomplete, ...complete];
+
+            updateProgress(complete.length, tasks.length);
+
+            let html = '';
+            sortedTasks.forEach(task => {
+                const isDone = task.completed;
+                const isYesterday = dateStr === getYesterdayStr();
+                const opacity = isYesterday ? 'opacity-70' : '';
+
+                html += `
+                    <div class="task-enter group relative bg-white dark:bg-slate-800 p-3 rounded-xl border-l-4 ${isDone ? 'border-green-400 bg-gray-50 dark:bg-slate-900/50 opacity-60' : 'border-indigo-500 shadow-sm dark:border-indigo-400 dark:shadow-none'} ${opacity} flex items-center gap-3 transition-all" onclick="toggleTask('${dateStr}', '${task.id}')">
+                        <div class="text-2xl pl-1 pointer-events-none">${task.icon}</div>
+                        <div class="flex-1 pointer-events-none">
+                            <p class="font-bold text-gray-800 dark:text-gray-100 ${isDone ? 'line-through text-gray-400 dark:text-gray-500' : ''} text-sm sm:text-base">${task.text}</p>
+                            ${isDone ? '<span class="text-[10px] text-green-600 dark:text-green-400 font-bold"><i class="fas fa-check"></i> Hoàn thành</span>' : ''}
+                        </div>
+                        
+                        <div class="flex items-center gap-1 sm:gap-2 z-10">
+                            ${!isDone ? `
+                            <button onclick="editTask(event, '${dateStr}', '${task.id}')" class="task-action-btn w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-700 text-indigo-500 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-slate-600 flex items-center justify-center hover:scale-110">
+                                <i class="fas fa-pencil-alt text-xs"></i>
+                            </button>
+                            ` : ''}
+                            
+                            <button onclick="deleteTask(event, '${dateStr}', '${task.id}')" class="task-action-btn w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-700 text-red-400 dark:text-red-300 hover:bg-red-100 dark:hover:bg-slate-600 flex items-center justify-center hover:scale-110">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+
+                            <div class="w-6 h-6 rounded-full border-2 ${isDone ? 'bg-green-500 border-green-500 dark:bg-green-600 dark:border-green-600' : 'border-gray-300 group-hover:border-indigo-500 dark:border-gray-600 dark:group-hover:border-indigo-400'} flex items-center justify-center text-white text-xs transition-colors ml-1 pointer-events-none">
+                                ${isDone ? '<i class="fas fa-check"></i>' : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (dateStr === getTodayStr() && incomplete.length === 0 && tasks.length > 0) {
+                 if (appData.user.lastCompletedDate !== dateStr) {
+                     appData.user.streak++;
+                     
+                     let earnedXP = 1; 
+                     let bonusXP = 0;
+                     let streak = appData.user.streak;
+                     
+                     if (streak % 5 === 0) {
+                         bonusXP = Math.floor(streak / 5);
+                     }
+                     
+                     appData.user.xp += (earnedXP + bonusXP);
+                     appData.user.lastCompletedDate = dateStr;
+                     
+                     updateRank(); 
+                     saveData();
+                     
+                     let msg = `🔥 Hoàn thành ngày! +${earnedXP} điểm`;
+                     if (bonusXP > 0) msg += ` & +${bonusXP} điểm thưởng chuỗi!`;
+                     
+                     showToast(msg, 'success');
+                     createConfetti();
+                     updateHeader(); 
+                 }
+            }
+
+            listContainer.innerHTML = html;
+        }
+
+        function updateProgress(done, total) {
+            const bar = document.getElementById('progress-bar');
+            const text = document.getElementById('progress-text');
+            if (!bar) return;
+            
+            const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+            bar.style.width = `${pct}%`;
+            text.innerText = `${pct}%`;
+        }
+
+        function toggleTask(dateStr, taskId) {
+            if (!appData.tasks[dateStr]) return;
+            
+            const task = appData.tasks[dateStr].find(t => t.id === taskId);
+            if (task) {
+                task.completed = !task.completed;
+                saveData();
+                renderTasks(dateStr); 
+                if (task.completed) showToast('Đã hoàn thành! Giỏi lắm Kin!', 'success');
+            }
+        }
+
+        function deleteTask(event, dateStr, taskId) {
+            event.stopPropagation(); 
+            if(confirm('Bạn có chắc chắn muốn xóa nhiệm vụ này không?')) {
+                appData.tasks[dateStr] = appData.tasks[dateStr].filter(t => t.id !== taskId);
+                saveData();
+                renderTasks(dateStr);
+                showToast('Đã xóa nhiệm vụ!', 'success');
+            }
+        }
+
+        function editTask(event, dateStr, taskId) {
+            event.stopPropagation(); 
+            const task = appData.tasks[dateStr].find(t => t.id === taskId);
+            if(!task) return;
+
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4';
+            modal.innerHTML = `
+                <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="this.parentElement.remove()"></div>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-sm z-10 animate-float shadow-2xl">
+                    <h3 class="text-xl font-bold mb-4 text-indigo-900 dark:text-indigo-300">Sửa nhiệm vụ</h3>
+                    
+                    <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Chọn biểu tượng</label>
+                    <div class="flex gap-2 overflow-x-auto pb-2 mb-4 hide-scrollbar">
+                        ${taskIcons.map(icon => `
+                            <button onclick="selectIcon(this, '${icon}')" class="icon-option flex-shrink-0 w-10 h-10 rounded-lg ${icon === task.icon ? 'bg-indigo-500 text-white' : 'bg-gray-100 dark:bg-slate-700'} text-xl hover:bg-indigo-100 dark:hover:bg-slate-600 focus:ring-2 focus:ring-indigo-500 transition-all">${icon}</button>
+                        `).join('')}
+                    </div>
+                    <input type="hidden" id="edit-selected-icon" value="${task.icon}">
+
+                    <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Nội dung công việc</label>
+                    <input type="text" id="edit-task-input" value="${task.text}" class="w-full bg-gray-50 dark:bg-slate-700 dark:text-white dark:border-slate-600 border border-gray-200 rounded-xl p-3 mb-6 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                    
+                    <div class="flex gap-3">
+                        <button onclick="this.closest('.fixed').remove()" class="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-slate-700 font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600">Hủy</button>
+                        <button onclick="saveEditedTask('${dateStr}', '${taskId}', this.closest('.fixed'))" class="flex-1 py-3 rounded-xl bg-indigo-600 font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none">Lưu thay đổi</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            window.selectIcon = function(btn, icon) {
+                const isEdit = document.getElementById('edit-selected-icon');
+                const targetId = isEdit ? 'edit-selected-icon' : 'selected-icon';
+                
+                const container = btn.parentElement;
+                container.querySelectorAll('.icon-option').forEach(b => {
+                    b.classList.remove('bg-indigo-500', 'text-white');
+                    b.classList.add('bg-gray-100');
+                    b.classList.add('dark:bg-slate-700');
+                });
+                btn.classList.remove('bg-gray-100');
+                btn.classList.remove('dark:bg-slate-700');
+                btn.classList.add('bg-indigo-500', 'text-white');
+                document.getElementById(targetId).value = icon;
+            }
+        }
+
+        function saveEditedTask(dateStr, taskId, modalElement) {
+            const text = document.getElementById('edit-task-input').value.trim();
+            const icon = document.getElementById('edit-selected-icon').value;
+            
+            if (!text) {
+                showToast('Nội dung không được để trống!', 'error');
+                return;
+            }
+
+            const taskIndex = appData.tasks[dateStr].findIndex(t => t.id === taskId);
+            if (taskIndex > -1) {
+                appData.tasks[dateStr][taskIndex].text = text;
+                appData.tasks[dateStr][taskIndex].icon = icon;
+                saveData();
+                renderTasks(dateStr);
+                showToast('Đã cập nhật nhiệm vụ!', 'success');
+            }
+            
+            modalElement.remove();
+        }
+
+        function openAddTaskModal(dateStr, label) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4';
+            modal.innerHTML = `
+                <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="this.parentElement.remove()"></div>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-sm z-10 animate-float shadow-2xl">
+                    <h3 class="text-xl font-bold mb-4 text-indigo-900 dark:text-indigo-300">Thêm nhiệm vụ: ${label}</h3>
+                    
+                    <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Chọn biểu tượng</label>
+                    <div class="flex gap-2 overflow-x-auto pb-2 mb-4 hide-scrollbar">
+                        ${taskIcons.map(icon => `
+                            <button onclick="selectIcon(this, '${icon}')" class="icon-option flex-shrink-0 w-10 h-10 rounded-lg bg-gray-100 dark:bg-slate-700 text-xl hover:bg-indigo-100 dark:hover:bg-slate-600 focus:ring-2 focus:ring-indigo-500 transition-all">${icon}</button>
+                        `).join('')}
+                    </div>
+                    <input type="hidden" id="selected-icon" value="💪">
+
+                    <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Nội dung công việc</label>
+                    <input type="text" id="new-task-input" class="w-full bg-gray-50 dark:bg-slate-700 dark:text-white dark:border-slate-600 border border-gray-200 rounded-xl p-3 mb-6 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="Ví dụ: Đọc 10 trang sách...">
+                    
+                    <div class="flex gap-3">
+                        <button onclick="this.closest('.fixed').remove()" class="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-slate-700 font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600">Hủy</button>
+                        <button onclick="addTask('${dateStr}', this.closest('.fixed'))" class="flex-1 py-3 rounded-xl bg-indigo-600 font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none">Thêm ngay</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            setTimeout(() => document.querySelector('.icon-option').click(), 0);
+            document.getElementById('new-task-input').focus();
+        }
+
+        function selectIcon(btn, icon) {
+            document.querySelectorAll('.icon-option').forEach(b => {
+                b.classList.remove('bg-indigo-500', 'text-white');
+                b.classList.add('bg-gray-100');
+                b.classList.add('dark:bg-slate-700');
+            });
+            btn.classList.remove('bg-gray-100');
+            btn.classList.remove('dark:bg-slate-700');
+            btn.classList.add('bg-indigo-500', 'text-white');
+            document.getElementById('selected-icon').value = icon;
+        }
+
+        function addTask(dateStr, modalElement) {
+            const text = document.getElementById('new-task-input').value.trim();
+            const icon = document.getElementById('selected-icon').value;
+            
+            if (!text) {
+                showToast('Vui lòng nhập nội dung!', 'error');
+                return;
+            }
+
+            if (!appData.tasks[dateStr]) appData.tasks[dateStr] = [];
+            
+            appData.tasks[dateStr].push({
+                id: Date.now().toString(),
+                text: text,
+                icon: icon,
+                completed: false,
+                timestamp: Date.now()
+            });
+            
+            saveData();
+            modalElement.remove();
+            
+            if (document.querySelector('.nav-btn.text-indigo-600').dataset.target === 'motivation') {
+                 renderMotivationPage(document.getElementById('main-content'));
+            }
+            showToast('Đã thêm nhiệm vụ mới!', 'success');
+        }
+
+        // --- PAGE: CALENDAR (UPDATED) ---
+        function changeMonth(offset) {
+            calendarViewDate.setMonth(calendarViewDate.getMonth() + offset);
+            router('calendar');
+        }
+
+        function renderCalendarPage(container) {
+            const currentMonth = calendarViewDate.getMonth();
+            const currentYear = calendarViewDate.getFullYear();
+            
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay(); // 0 is Sunday
+            
+            const monthNames = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
+
+            let daysHtml = '';
+            
+            // Empty slots for previous month
+            for (let i = 0; i < firstDayIndex; i++) {
+                daysHtml += `<div class="aspect-square"></div>`;
+            }
+
+            // Days
+            const todayStr = getTodayStr();
+            const todayDateObj = new Date(todayStr); 
+
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                const thisDateObj = new Date(dateStr);
+
+                const hasEvent = appData.events.some(e => e.date === dateStr);
+                const taskStatus = appData.tasks[dateStr] ? (appData.tasks[dateStr].every(t => t.completed) ? 'win' : 'fail') : 'none';
+                
+                let dotHtml = hasEvent ? '<div class="w-1.5 h-1.5 bg-indigo-500 rounded-full mx-auto mt-1"></div>' : '';
+                let borderClass = 'border-transparent';
+                let bgClass = 'bg-white hover:bg-gray-50 dark:bg-slate-800 dark:hover:bg-slate-700';
+                let textClass = 'text-gray-700 dark:text-gray-300';
+                let opacityClass = 'opacity-100';
+
+                if (thisDateObj < todayDateObj) {
+                    opacityClass = 'opacity-40 grayscale-[0.8]'; 
+                }
+
+                if (dateStr === todayStr) {
+                    bgClass = 'bg-indigo-600 shadow-md shadow-indigo-200 text-white dark:bg-indigo-700 dark:shadow-none';
+                    textClass = 'text-white';
+                    opacityClass = 'opacity-100'; 
+                    if (hasEvent) dotHtml = '<div class="w-1.5 h-1.5 bg-white rounded-full mx-auto mt-1"></div>';
+                } else if (taskStatus === 'win') {
+                    borderClass = 'border-green-400';
+                    bgClass = 'bg-green-50 dark:bg-green-900/30';
+                } else if (appData.tasks[dateStr] && taskStatus === 'fail') {
+                    if (thisDateObj < todayDateObj) {
+                         borderClass = 'border-red-300';
+                    }
+                }
+
+                daysHtml += `
+                    <button onclick="openDayDetail('${dateStr}')" class="aspect-square rounded-2xl flex flex-col items-center justify-center text-sm font-bold border-2 ${borderClass} ${bgClass} ${textClass} ${opacityClass} transition-all active:scale-95">
+                        <span>${i}</span>
+                        ${dotHtml}
+                    </button>
+                `;
+            }
+
+            container.innerHTML = `
+                <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-sm mb-4">
+                    <div class="flex justify-between items-center mb-6">
+                        <button onclick="changeMonth(-1)" class="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-center text-gray-500 dark:text-gray-400 transition-colors">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <h2 class="text-xl font-bold text-gray-800 dark:text-white text-center">
+                            ${monthNames[currentMonth]} <br> 
+                            <span class="text-indigo-600 dark:text-indigo-400 text-sm">${currentYear}</span>
+                        </h2>
+                        <button onclick="changeMonth(1)" class="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-center text-gray-500 dark:text-gray-400 transition-colors">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+                        <div>CN</div><div>T2</div><div>T3</div><div>T4</div><div>T5</div><div>T6</div><div>T7</div>
+                    </div>
+                    <div class="grid grid-cols-7 gap-3">
+                        ${daysHtml}
+                    </div>
+                </div>
+                
+                <div class="bg-indigo-50 dark:bg-slate-800 p-4 rounded-xl border border-indigo-100 dark:border-slate-700">
+                    <h3 class="font-bold text-indigo-900 dark:text-indigo-300 mb-2"><i class="fas fa-info-circle mr-1"></i> Ghi chú</h3>
+                    <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        <div class="w-3 h-3 bg-indigo-600 rounded-full"></div> Hôm nay
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        <div class="w-1.5 h-1.5 bg-indigo-500 rounded-full mx-1"></div> Có lịch trình
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 opacity-50">
+                        <div class="w-3 h-3 bg-gray-300 rounded-full"></div> Ngày đã qua (Mờ)
+                    </div>
+                </div>
+            `;
+        }
+
+        function openDayDetail(dateStr) {
+            const popup = document.getElementById('date-popup');
+            const backdrop = document.getElementById('modal-backdrop');
+            const title = document.getElementById('popup-date-title');
+            const content = document.getElementById('popup-content');
+
+            title.innerHTML = `<i class="far fa-calendar-check text-indigo-500"></i> ${dateStr.split('-').reverse().join('/')}`;
+            
+            const daysEvents = appData.events.filter(e => e.date === dateStr).sort((a,b) => a.time.localeCompare(b.time));
+            const daysTasks = appData.tasks[dateStr] || [];
+
+            let html = '';
+
+            if (daysEvents.length > 0) {
+                html += `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-1">Lịch Trình</h4>`;
+                daysEvents.forEach(e => {
+                    html += `
+                        <div class="bg-indigo-50 dark:bg-slate-700 p-3 rounded-xl border-l-4 border-indigo-500 dark:border-indigo-400 mb-2">
+                            <div class="flex justify-between items-start">
+                                <span class="font-bold text-indigo-900 dark:text-indigo-200">${e.time}</span>
+                                <span class="text-xs bg-indigo-200 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 px-2 py-0.5 rounded-full">${e.title}</span>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">${e.desc}</p>
+                        </div>
+                    `;
+                });
+            } else {
+                 html += `<p class="text-gray-400 italic text-sm mb-4">Không có lịch trình.</p>`;
+            }
+
+            html += `<h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4">Nhiệm vụ</h4>`;
+            if (daysTasks.length > 0) {
+                 daysTasks.forEach(t => {
+                     html += `
+                        <div class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 py-1">
+                            <span class="${t.completed ? 'text-green-500' : 'text-gray-300'}"><i class="fas fa-${t.completed ? 'check-circle' : 'circle'}"></i></span>
+                            <span class="${t.completed ? 'line-through opacity-50' : ''}">${t.text}</span>
+                        </div>
+                     `;
+                 });
+            } else {
+                html += `<p class="text-gray-400 italic text-sm">Chưa có nhiệm vụ.</p>`;
+            }
+
+            content.innerHTML = html;
+
+            backdrop.classList.remove('hidden');
+            setTimeout(() => backdrop.classList.remove('opacity-0'), 10);
+            popup.classList.remove('translate-y-full');
+        }
+
+        function closeModal() {
+            const popup = document.getElementById('date-popup');
+            const backdrop = document.getElementById('modal-backdrop');
+            
+            popup.classList.add('translate-y-full');
+            backdrop.classList.add('opacity-0');
+            setTimeout(() => backdrop.classList.add('hidden'), 300);
+        }
+
+        // --- PAGE: CREATE SCHEDULE ---
+        function renderCreateSchedulePage(container) {
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+
+            container.innerHTML = `
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm">
+                    <h2 class="text-2xl font-bold text-indigo-900 dark:text-indigo-300 mb-6">Tạo Lịch Mới</h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-500 dark:text-gray-400 mb-1">Ngày</label>
+                            <input type="date" id="event-date" class="w-full bg-gray-50 dark:bg-slate-700 dark:text-white dark:border-slate-600 border border-gray-200 rounded-xl p-3 focus:ring-indigo-500 focus:border-indigo-500 outline-none" value="${getTodayStr()}">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-bold text-gray-500 dark:text-gray-400 mb-2">Giờ & Phút</label>
+                            <div class="flex gap-3 h-40 bg-gray-50 dark:bg-slate-700 rounded-xl border border-gray-200 dark:border-slate-600 p-2 relative overflow-hidden">
+                                <div class="absolute top-1/2 left-2 right-2 h-10 -mt-5 bg-indigo-100 dark:bg-indigo-900/40 rounded-lg pointer-events-none border border-indigo-200 dark:border-indigo-800 z-0"></div>
+
+                                <div class="flex-1 overflow-y-auto hide-scrollbar text-center relative z-10 snap-y snap-mandatory py-[calc(5rem-1.25rem)]" id="hour-scroller">
+                                    ${Array.from({length: 24}, (_, i) => {
+                                        const h = String(i).padStart(2, '0');
+                                        const isSelected = i === currentHour;
+                                        return `<div onclick="selectTime('hour', '${h}', this)" class="time-item h-10 flex items-center justify-center font-bold snap-center cursor-pointer transition-colors ${isSelected ? 'text-indigo-600 dark:text-indigo-400 text-xl scale-110' : 'text-gray-400'}" data-val="${h}">${h}</div>`;
+                                    }).join('')}
+                                </div>
+                                
+                                <div class="flex items-center text-2xl font-bold text-indigo-300 z-10 pb-1">:</div>
+                                
+                                <div class="flex-1 overflow-y-auto hide-scrollbar text-center relative z-10 snap-y snap-mandatory py-[calc(5rem-1.25rem)]" id="minute-scroller">
+                                    ${Array.from({length: 60}, (_, i) => {
+                                        const m = String(i).padStart(2, '0');
+                                        const isSelected = i === currentMinute;
+                                        return `<div onclick="selectTime('minute', '${m}', this)" class="time-item h-10 flex items-center justify-center font-bold snap-center cursor-pointer transition-colors ${isSelected ? 'text-indigo-600 dark:text-indigo-400 text-xl scale-110' : 'text-gray-400'}" data-val="${m}">${m}</div>`;
+                                    }).join('')}
+                                </div>
+                            </div>
+                            <input type="hidden" id="event-hour" value="${String(currentHour).padStart(2, '0')}">
+                            <input type="hidden" id="event-minute" value="${String(currentMinute).padStart(2, '0')}">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-bold text-gray-500 dark:text-gray-400 mb-1">Tiêu đề việc</label>
+                            <input type="text" id="event-title" placeholder="Họp team, Đá bóng..." class="w-full bg-gray-50 dark:bg-slate-700 dark:text-white dark:border-slate-600 border border-gray-200 rounded-xl p-3 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-500 dark:text-gray-400 mb-1">Mô tả chi tiết</label>
+                            <textarea id="event-desc" rows="3" placeholder="Ghi chú thêm..." class="w-full bg-gray-50 dark:bg-slate-700 dark:text-white dark:border-slate-600 border border-gray-200 rounded-xl p-3 focus:ring-indigo-500 focus:border-indigo-500 outline-none"></textarea>
+                        </div>
+                        
+                        <button onclick="saveEvent()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transform active:scale-95 transition-transform mt-4">
+                            Lưu Lịch Trình
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                     <h3 class="font-bold text-gray-700 dark:text-gray-400 mb-3">Lịch trình sắp tới</h3>
+                     <div id="upcoming-list" class="space-y-2">
+                     </div>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                scrollToSelected('hour-scroller');
+                scrollToSelected('minute-scroller');
+            }, 50);
+
+            renderUpcomingEvents();
+        }
+
+        function selectTime(type, val, el) {
+            const container = el.parentElement;
+            container.querySelectorAll('.time-item').forEach(item => {
+                item.className = 'time-item h-10 flex items-center justify-center font-bold snap-center cursor-pointer transition-colors text-gray-400';
+            });
+            el.className = 'time-item h-10 flex items-center justify-center font-bold snap-center cursor-pointer transition-colors text-indigo-600 dark:text-indigo-400 text-xl scale-110';
+            
+            document.getElementById(`event-${type}`).value = val;
+            
+            const parent = el.parentElement;
+            parent.scrollTo({
+                top: el.offsetTop - parent.offsetTop - (parent.clientHeight / 2) + (el.clientHeight / 2),
+                behavior: 'smooth'
+            });
+        }
+
+        function scrollToSelected(containerId) {
+            const container = document.getElementById(containerId);
+            const selected = container.querySelector('.text-indigo-600'); // Or dark variant
+            if (selected) {
+                 container.scrollTop = selected.offsetTop - container.offsetTop - (container.clientHeight / 2) + (selected.clientHeight / 2);
+            }
+        }
+
+        function saveEvent() {
+            const date = document.getElementById('event-date').value;
+            const hour = document.getElementById('event-hour').value;
+            const minute = document.getElementById('event-minute').value;
+            const title = document.getElementById('event-title').value;
+            const desc = document.getElementById('event-desc').value;
+            
+            const time = `${hour}:${minute}`;
+
+            if(!date || !time || !title) {
+                showToast('Thiếu thông tin ngày/giờ/tiêu đề!', 'error');
+                return;
+            }
+
+            appData.events.push({
+                id: Date.now().toString(),
+                date, time, title, desc
+            });
+            saveData();
+            
+            showToast('Đã lưu lịch trình!', 'success');
+            document.getElementById('event-title').value = '';
+            document.getElementById('event-desc').value = '';
+            renderUpcomingEvents();
+        }
+        
+        function renderUpcomingEvents() {
+            const container = document.getElementById('upcoming-list');
+            const todayStr = getTodayStr();
+            
+            const upcoming = appData.events
+                .filter(e => e.date >= todayStr)
+                .sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time))
+                .slice(0, 5);
+                
+            if(upcoming.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-400">Không có lịch sắp tới.</p>';
+                return;
+            }
+
+            container.innerHTML = upcoming.map(e => `
+                <div class="bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-100 dark:border-slate-700 flex justify-between items-center relative overflow-hidden group">
+                     <div>
+                        <div class="text-xs font-bold text-indigo-500 dark:text-indigo-400">${e.date.split('-').reverse().join('/')} • ${e.time}</div>
+                        <div class="font-bold text-gray-800 dark:text-white">${e.title}</div>
+                     </div>
+                     <button onclick="deleteEvent('${e.id}')" class="text-red-400 hover:text-red-600 px-2 py-1"><i class="fas fa-trash"></i></button>
+                </div>
+            `).join('');
+        }
+
+        function deleteEvent(id) {
+            if(confirm('Xóa lịch này?')) {
+                appData.events = appData.events.filter(e => e.id !== id);
+                saveData();
+                renderUpcomingEvents();
+            }
+        }
+
+        // --- PAGE: HISTORY ---
+        function renderHistoryPage(container) {
+            const dates = Object.keys(appData.tasks).sort().reverse();
+            
+            if (dates.length === 0) {
+                 container.innerHTML = '<div class="text-center text-gray-400 dark:text-gray-500 mt-10">Chưa có lịch sử.</div>';
+                 return;
+            }
+
+            let html = '<div class="space-y-4">';
+            dates.forEach(date => {
+                const tasks = appData.tasks[date];
+                const completedCount = tasks.filter(t => t.completed).length;
+                const total = tasks.length;
+                const percent = total === 0 ? 0 : Math.round((completedCount/total)*100);
+                const isWin = percent === 100;
+
+                html += `
+                    <div class="relative bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border-l-8 ${isWin ? 'border-green-400' : 'border-orange-400'} group">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-bold text-gray-800 dark:text-white">${date.split('-').reverse().join('/')}</h3>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold px-2 py-1 rounded ${isWin ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'}">
+                                    ${isWin ? 'HOÀN THÀNH' : 'THẤT BẠI'}
+                                </span>
+                                <button onclick="deleteHistoryDay('${date}')" class="text-gray-300 hover:text-red-500 transition-colors p-1">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-1.5 mb-2">
+                            <div class="bg-indigo-600 h-1.5 rounded-full" style="width: ${percent}%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">${completedCount}/${total} nhiệm vụ</p>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function deleteHistoryDay(dateStr) {
+            if(confirm(`Bạn có chắc muốn xóa lịch sử ngày ${dateStr}?`)) {
+                delete appData.tasks[dateStr];
+                saveData();
+                renderHistoryPage(document.getElementById('main-content'));
+                showToast('Đã xóa lịch sử ngày ' + dateStr, 'success');
+            }
+        }
+
+        // --- PAGE: PROFILE ---
+        function renderProfilePage(container) {
+            const xp = appData.user.xp;
+            const streak = appData.user.streak;
+            const rank = appData.user.rank;
+            const rankData = ranks.find(r => r.name === rank) || ranks[0];
+            const isDark = appData.settings.theme === 'dark';
+            
+            const nextRankIdx = ranks.findIndex(r => r.name === rank) + 1;
+            const nextRank = ranks[nextRankIdx];
+            
+            let progressToNext = 100;
+            let nextText = "Đã đạt cấp tối đa!";
+            let currentLevelXP = rankData.minXP;
+            let nextLevelXP = nextRank ? nextRank.minXP : xp;
+            let avatarUrl = rankData.avatar;
+
+            if (nextRank) {
+                const range = nextLevelXP - currentLevelXP;
+                const gained = xp - currentLevelXP;
+                progressToNext = Math.min(100, Math.round((gained / range) * 100));
+                nextText = `${xp}/${nextLevelXP} XP để lên ${nextRank.name}`;
+            }
+
+            // Special effect for high ranks
+            const isHighRank = ranks.findIndex(r => r.name === rank) >= 6; // From Kim Cương up
+
+            container.innerHTML = `
+                <div class="flex flex-col items-center pt-8">
+                    
+                    <!-- Dark Mode Toggle Switch -->
+                    <div class="flex items-center justify-between w-full bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm mb-6 border border-gray-100 dark:border-slate-700">
+                        <span class="font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2"><i class="fas fa-moon text-indigo-500"></i> Chế độ tối</span>
+                        <button onclick="toggleTheme()" class="w-12 h-6 rounded-full p-1 transition-colors duration-300 ${isDark ? 'bg-indigo-600' : 'bg-gray-300'} relative">
+                            <div class="absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${isDark ? 'translate-x-6' : ''}"></div>
+                        </button>
+                    </div>
+
+                    <div class="w-40 h-40 rounded-full p-1 bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 mb-4 shadow-xl ${isHighRank ? 'avatar-glow' : ''}">
+                        <div class="w-full h-full bg-white rounded-full flex items-center justify-center overflow-hidden">
+                            <img src="${avatarUrl}" alt="Kin Avatar" class="w-full h-full object-cover bg-indigo-50">
+                        </div>
+                    </div>
+                    
+                    <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-1">${appData.user.name}</h2>
+                    <div class="px-4 py-1 rounded-full ${rankData.color} text-sm font-bold border mb-4 shadow-sm flex items-center gap-2">
+                        <span>${rank}</span>
+                        <span class="w-1 h-4 bg-black/10"></span>
+                        <span>${xp} XP</span>
+                    </div>
+                    
+                    <button onclick="showRankRules()" class="text-xs text-indigo-500 dark:text-indigo-400 font-bold mb-6 hover:underline"><i class="fas fa-info-circle"></i> Xem luật thăng hạng</button>
+
+                    <div class="w-full bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-sm mb-6 border border-gray-100 dark:border-slate-700">
+                        <div class="flex justify-between items-end mb-2">
+                            <span class="text-gray-500 dark:text-gray-400 font-bold text-xs">TIẾN ĐỘ THĂNG HẠNG</span>
+                            <span class="text-indigo-600 dark:text-indigo-400 font-bold text-xs">${nextText}</span>
+                        </div>
+                        <div class="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-4 overflow-hidden shadow-inner">
+                            <div class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full rounded-full transition-all duration-1000 flex items-center justify-end pr-2" style="width: ${progressToNext}%">
+                                <span class="text-[8px] text-white font-bold">${progressToNext}%</span>
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-2 text-center italic">Cố gắng duy trì chuỗi để nhận điểm thưởng!</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 w-full">
+                        <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm text-center border-b-4 border-orange-100 dark:border-orange-900/30">
+                            <div class="text-3xl mb-1">🔥</div>
+                            <div class="text-2xl font-bold text-gray-800 dark:text-white">${streak}</div>
+                            <div class="text-xs text-gray-400 font-bold uppercase">Chuỗi ngày</div>
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm text-center border-b-4 border-blue-100 dark:border-blue-900/30">
+                            <div class="text-3xl mb-1">💎</div>
+                            <div class="text-2xl font-bold text-gray-800 dark:text-white">${xp}</div>
+                            <div class="text-xs text-gray-400 font-bold uppercase">Tổng điểm XP</div>
+                        </div>
+                    </div>
+                    
+                    <button onclick="resetData()" class="mt-8 text-xs text-red-300 underline">Reset toàn bộ dữ liệu</button>
+                </div>
+            `;
+        }
+
+        function showRankRules() {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4';
+            modal.innerHTML = `
+                <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="this.parentElement.remove()"></div>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-sm z-10 animate-float shadow-2xl max-h-[80vh] overflow-y-auto">
+                    <h3 class="text-xl font-bold mb-4 text-indigo-900 dark:text-indigo-300 text-center">🏆 Luật Thăng Hạng & Avatar</h3>
+                    
+                    <div class="space-y-4 text-sm text-gray-600 dark:text-gray-300">
+                        <div class="bg-indigo-50 dark:bg-slate-700 p-3 rounded-xl border border-indigo-100 dark:border-slate-600">
+                            <p class="font-bold text-indigo-700 dark:text-indigo-300 mb-1">🎯 Avatar thay đổi theo Rank</p>
+                            <p>Mỗi lần lên cấp, Avatar của bạn sẽ được nâng cấp ngầu hơn, trang bị xịn hơn và hiệu ứng đẹp hơn!</p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <p class="font-bold text-gray-800 dark:text-white">📊 Các mốc Rank</p>
+                            ${ranks.map(r => `
+                                <div class="flex justify-between items-center p-2 rounded bg-gray-50 dark:bg-slate-700">
+                                    <div class="flex items-center gap-2">
+                                        <img src="${r.avatar}" class="w-8 h-8 rounded-full bg-white border">
+                                        <span class="font-bold ${r.color.replace('bg-', 'text-').split(' ')[0]}">${r.name}</span>
+                                    </div>
+                                    <span class="font-bold text-gray-400">${r.minXP} XP</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <button onclick="this.closest('.fixed').remove()" class="w-full mt-6 py-3 rounded-xl bg-indigo-600 font-bold text-white hover:bg-indigo-700 shadow-lg">Đã hiểu!</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        function resetData() {
+            if(confirm("CẢNH BÁO: Bạn có chắc muốn xóa toàn bộ dữ liệu không?")) {
+                localStorage.removeItem(APP_KEY);
+                location.reload();
+            }
+        }
+
+        // --- UTILS ---
+        function updateHeader() {
+            document.getElementById('header-streak').innerText = appData.user.streak;
+            const rankData = ranks.find(r => r.name === appData.user.rank) || ranks[0];
+            const badge = document.getElementById('header-rank-badge');
+            badge.className = `px-2 py-1 rounded-lg text-xs font-bold border flex items-center ${rankData.color}`;
+            
+            // Update header avatar
+            document.getElementById('header-avatar-img').src = rankData.avatar;
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bg = type === 'success' ? 'bg-indigo-600' : 'bg-red-500';
+            const icon = type === 'success' ? 'check-circle' : 'exclamation-circle';
+            
+            toast.className = `${bg} text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 transform translate-y-[-20px] opacity-0 transition-all duration-300 pointer-events-auto min-w-[200px]`;
+            toast.innerHTML = `
+                <i class="fas fa-${icon}"></i>
+                <span class="font-bold text-sm">${message}</span>
+            `;
+            
+            container.appendChild(toast);
+            
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-[-20px]', 'opacity-0');
+            });
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-[-20px]');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function createConfetti() {
+            for(let i=0; i<30; i++) {
+                const conf = document.createElement('div');
+                conf.className = 'fixed z-50 w-2 h-2 rounded-sm pointer-events-none';
+                conf.style.backgroundColor = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff'][Math.floor(Math.random()*5)];
+                conf.style.left = Math.random() * 100 + 'vw';
+                conf.style.top = '-10px';
+                conf.style.animation = `confetti ${1 + Math.random()*2}s linear forwards`;
+                document.body.appendChild(conf);
+                setTimeout(() => conf.remove(), 3000);
+            }
+        }
+
+        // Start App
+        init();
+    </script>
+</body>
+</html>
